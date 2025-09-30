@@ -1,0 +1,117 @@
+/* ---------- THEME TOKENS ---------- */
+:root {
+  /* Base */
+  --bg: #0b1020;
+  --panel: #121831;
+  --panel-2: #0f1533;            /* kpi boxes, tracks, inputs */
+  --text: #e8ecff;
+  --muted: #9aa3c7;
+
+  /* Brand & Status */
+  --brand: #6aa6ff;
+  --brand2: #95d0ff;
+  --ok: #7fdc82;
+  --warn: #f2cc60;
+  --err: #ff7a7a;
+
+  /* Borders */
+  --border: #1b2447;
+  --border-strong: #2a3975;
+
+  /* Badges & Table header */
+  --badge-bg: #0f1a3c;
+  --badge-border: #273a7a;
+  --th-bg: #101735;
+
+  /* Gradients (tabs, buttons, bars) */
+  --tab-grad-start: #152047;
+  --tab-grad-end: #101735;
+  --btn-grad-start: #1d2a59;
+  --btn-grad-end: #13214a;
+
+  /* Charts/semantic */
+  --pos: #7dffa0;
+  --neg: #ff8b8b;
+
+  /* Misc */
+  --img-bg: #0b0f26;
+  --backdrop: rgba(0,0,0,0.35);
+  --elev-shadow: -12px 0 24px rgba(0,0,0,0.25);
+}
+
+/* Light mode equivalents */
+:root[data-theme="light"] {
+  /* Base */
+  --bg: #ffffff;
+  --panel: #f7f8fc;
+  --panel-2: #eef2ff;           /* slightly tinted light panel for inputs/kpis */
+  --text: #101828;
+  --muted: #667085;
+
+  /* Brand & Status */
+  --brand: #3366ff;
+  --brand2: #6690ff;
+  --ok: #0e9f6e;
+  --warn: #b48a1f;
+  --err: #b42318;
+
+  /* Borders */
+  --border: #e3e6ef;
+  --border-strong: #c7d2fe;
+
+  /* Badges & Table header */
+  --badge-bg: #eef1f8;
+  --badge-border: #c7d2fe;
+  --th-bg: #f2f4f7;
+
+  /* Gradients */
+  --tab-grad-start: #e9efff;
+  --tab-grad-end: #e5ebff;
+  --btn-grad-start: #edf2ff;
+  --btn-grad-end: #e6ecff;
+
+  /* Charts/semantic */
+  --pos: #16a34a;
+  --neg: #dc2626;
+
+  /* Misc */
+  --img-bg: transparent;
+  --backdrop: rgba(0,0,0,0.2);
+  --elev-shadow: -12px 0 24px rgba(0,0,0,0.08);
+}
+
+/* ---------- GLOBAL HELPERS (minimal) ---------- */
+html, body, #root { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Reusable surface helpers (used in App header & cards) */
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+/* Buttons/inputs/badges share theme tokens.
+   (Your detailed layout/spacing still lives in styles.css) */
+.btn {
+  border: 1px solid var(--border-strong);
+  background: linear-gradient(180deg, var(--btn-grad-start), var(--btn-grad-end) 60%);
+  color: var(--text);
+}
+
+.input {
+  background: var(--panel-2);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+}
+
+.badge {
+  background: var(--badge-bg);
+  border: 1px solid var(--badge-border);
+  color: var(--muted);
+}
