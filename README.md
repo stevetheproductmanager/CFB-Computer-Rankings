@@ -1,19 +1,53 @@
 # digdat0 Computer Rankings
 
-What This Is
+# About This Ranking
 
-This tool creates an independent ranking system for college football teams. Unlike traditional polls, which rely on human voters, our approach is fully data-driven. Every FBS team is ranked based on their performance to date, with all games (including FCS opponents) factored into the evaluation. The goal is to provide a fair, transparent, and objective look at which teams have truly earned their spot.
+This project creates an **independent ranking system for college football teams**.  
+Unlike traditional polls, which rely on human voters, our approach is fully **data-driven**.  
+Every FBS team is ranked based on their performance to date, with all games (including FCS opponents) factored into the evaluation.  
 
-How We Calculate the Rankings
+The goal: **a fair, transparent, and objective look** at which teams have truly earned their spot.
+
+---
+
+## How We Calculate the Rankings
 
 Our algorithm blends several factors into a single score for each team:
-Win–Loss Record: Baseline measure of results on the field.
-Game Results & Margin of Victory: Quality of wins and competitiveness of losses, with caps to avoid inflating blowouts.
-Strength of Schedule (SOS): Adjusts for the difficulty of opponents played, including both FBS and FCS teams.
-Quality & Recency: Wins against higher-ranked opponents are weighted more, with recent games carrying slightly more influence.
-Top Wins: Credit is given for victories over Top 10, Top 25, and Top 50 teams.
-Efficiency (Offense & Defense Ranks): Advanced metrics that reward balanced, sustainable performance, not just outcomes.
-Each of these inputs is normalized and combined to produce a single composite score. Teams are then ordered by this score, giving you the current pecking order based purely on performance and context — no bias, no reputation, just the numbers.
+
+- **Win–Loss Record**  
+  Baseline measure of results on the field.
+
+- **Game Results & Margin of Victory**  
+  Quality of wins and competitiveness of losses, with caps to avoid inflating blowouts.
+
+- **Strength of Schedule (SOS)**  
+  Adjusts for the difficulty of opponents played, including both FBS and FCS teams.
+
+- **Quality & Recency**  
+  Wins against higher-ranked opponents are weighted more, with recent games carrying slightly more influence.
+
+- **Top Wins**  
+  Extra credit for victories over:
+  - Top 10 teams  
+  - Top 25 teams  
+  - Top 50 teams  
+
+- **Efficiency (Offense & Defense Ranks)**  
+  Advanced metrics that reward balanced, sustainable performance, not just outcomes.
+
+---
+
+## The Composite Score
+
+Each of these inputs is:
+
+1. **Normalized** (scaled so they can be compared evenly)  
+2. **Weighted** (some factors, like SOS or quality wins, matter more than others)  
+3. **Combined** into a single composite score  
+
+Teams are then ordered by this score to produce the rankings.  
+The result: **no bias, no reputation — just the numbers.**
+
 
 This version includes:
 - Data Download tab (season JSON saved locally)
