@@ -14,8 +14,9 @@ async function fetchJSON(path){
 const fmt = (n, d=3) => (typeof n === 'number' ? n : 0).toFixed(d)
 const fmt0 = (n) => (typeof n === 'number' ? Math.round(n) : 0)
 
-function CopyButton({ payload }) {
+function CopyButton({ payload, teamName }) {
   const [ok, setOk] = React.useState(false);
+  const [showTip, setShowTip] = React.useState(false);
 
   const handleClick = async (e) => {
     e?.stopPropagation?.();
@@ -25,11 +26,45 @@ function CopyButton({ payload }) {
   };
 
   return (
-    <button className="btn copy-btn" onClick={handleClick} title="Copy summary">
-      {ok ? <span className="checkmark">✓</span> : <span className="copy-text">Copy</span>}
-    </button>
+    <div
+      style={{ position: 'relative', display: 'inline-block' }}
+      onMouseEnter={() => setShowTip(true)}
+      onMouseLeave={() => setShowTip(false)}
+    >
+      <button
+        className="btn copy-btn"
+        onClick={handleClick}
+        style={{ position: 'relative', zIndex: 2 }}
+      >
+        {ok ? <span className="checkmark">✓</span> : <span className="copy-text">Copy</span>}
+      </button>
+
+      {showTip && (
+        <div
+          style={{
+            position: 'absolute',
+            right: '105%',        // 👈 positions tooltip to the left
+            top: '50%',
+            transform: 'translateY(-50%)',
+            background: '#222',
+            color: '#fff',
+            padding: '4px 8px',
+            borderRadius: '4px',
+            whiteSpace: 'nowrap',
+            fontSize: '0.8rem',
+            pointerEvents: 'none',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+          }}
+        >
+          {teamName || 'Copy'}
+        </div>
+      )}
+    </div>
   );
 }
+
+
+
 
 
 
@@ -444,7 +479,7 @@ t.logo = lm.get(t.name) || null;
                     <td style={{ padding:'8px' }}>{t.defRank || '—'}</td>
                     <td style={{ padding:'8px', fontWeight:700 }}>{fmt(t.score,3)}</td>
                     <td style={{ padding:'8px' }}>
-                      <CopyButton payload={payload} />
+                      <CopyButton payload={payload} teamName={`#${t.rank} ${t.name}`} />
                     </td>
                   </tr>
                 )
