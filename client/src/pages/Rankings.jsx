@@ -14,7 +14,7 @@ async function fetchJSON(path){
 const fmt = (n, d=3) => (typeof n === 'number' ? n : 0).toFixed(d)
 const fmt0 = (n) => (typeof n === 'number' ? Math.round(n) : 0)
 
-function CopyButton({ payload, teamName }) {
+function CopyButton({ payload, teamName, logo }) {
   const [ok, setOk] = React.useState(false);
   const [showTip, setShowTip] = React.useState(false);
 
@@ -34,16 +34,47 @@ function CopyButton({ payload, teamName }) {
       <button
         className="btn copy-btn"
         onClick={handleClick}
-        style={{ position: 'relative', zIndex: 2 }}
+        style={{ position: 'relative', zIndex: 2, display:'inline-flex', alignItems:'center', gap:8, paddingInline:10 }}
       >
-        {ok ? <span className="checkmark">✓</span> : <span className="copy-text">Copy</span>}
+        {/* Team logo on the left */}
+        {logo && (
+          <img
+            src={logo}
+            alt=""
+            width={18}
+            height={18}
+            style={{ borderRadius: 2, display:'block' }}
+          />
+        )}
+
+        {/* Copy icon (replaces the "Copy" text). Shows a check when done */}
+        {ok ? (
+          <span className="checkmark" aria-hidden="true">✓</span>
+        ) : (
+          <svg
+            aria-hidden="true"
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ display:'block' }}
+          >
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+        )}
       </button>
 
       {showTip && (
         <div
           style={{
             position: 'absolute',
-            right: '105%',        // 👈 positions tooltip to the left
+            right: '105%',
             top: '50%',
             transform: 'translateY(-50%)',
             background: '#222',
@@ -62,7 +93,6 @@ function CopyButton({ payload, teamName }) {
     </div>
   );
 }
-
 
 
 
@@ -225,9 +255,11 @@ function Drawer({ open, team, onClose, onPrev, onNext, rankMap, teamMap }) {
 
           <div className="drawer-section">
             <div className="row" style={{ gap: 6 }}>
-              <CopyButton payload={
-                `#${rank} ${name} (${conference}) — Score ${fmt(score,3)} | Results ${fmt(results,3)}, SOS ${fmt(sos,3)}, Quality ${fmt(quality,3)}, Recency ${fmt(rec||0,3)} | T10W ${top10Wins||0}, T25W ${top25Wins||0}, T50W ${top50Wins||0}, PF ${fmt0(pf)}, PA ${fmt0(pa)}, OffR ${offRank||'—'}, DefR ${defRank||'—'}`
-              }/>
+             <CopyButton
+              payload={`#${rank} ${name} (${conference}) — Score ${fmt(score,3)} | Results ${fmt(results,3)}, SOS ${fmt(sos,3)}, Quality ${fmt(quality,3)}, Recency ${fmt(rec||0,3)} | T10W ${top10Wins||0}, T25W ${top25Wins||0}, T50W ${top50Wins||0}, PF ${fmt0(pf)}, PA ${fmt0(pa)}, OffR ${offRank||'—'}, DefR ${defRank||'—'}`}
+              teamName={`#${rank} ${name}`}
+              logo={team?.logo}
+            />
               <button className="btn" onClick={onClose}>Close</button>
             </div>
           </div>
@@ -479,8 +511,12 @@ t.logo = lm.get(t.name) || null;
                     <td style={{ padding:'8px' }}>{t.defRank || '—'}</td>
                     <td style={{ padding:'8px', fontWeight:700 }}>{fmt(t.score,3)}</td>
                     <td style={{ padding:'8px' }}>
-                      <CopyButton payload={payload} teamName={`#${t.rank} ${t.name}`} />
-                    </td>
+                    <CopyButton
+                      payload={payload}
+                      teamName={`#${t.rank} ${t.name}`}
+                      logo={t.logo}
+                    />                   
+                     </td>
                   </tr>
                 )
               })}
