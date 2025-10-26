@@ -41,8 +41,8 @@ function CopyButton({ payload, teamName, logo }) {
           <img
             src={logo}
             alt=""
-            width={24}
-            height={24}
+            width={18}
+            height={18}
             style={{ borderRadius: 2, display:'block' }}
           />
         )}
@@ -481,33 +481,12 @@ t.logo = lm.get(t.name) || null;
                     onClick={() => openAt(i)}
                   >
                     <td style={{ padding:'8px' }}>{t.rank}</td>
-                    <td style={{ padding:'8px' }}>
-                      <div style={{ display:'flex', alignItems:'center', gap:8, whiteSpace:'nowrap' }}>
-                        <div
-                          style={{
-                            width: 24,
-                            height: 24,
-                            flex: '0 0 24px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}
-                        >
-                          {t.logo ? (
-                            <img
-                              src={t.logo}
-                              alt={`${t.name} logo`}
-                              style={{ width:'100%', height:'100%', objectFit:'contain', display:'block' }}
-                            />
-                          ) : (
-                            // keeps name aligned even when no logo
-                            <div style={{ width:24, height:24 }} />
-                          )}
-                        </div>
-                        <span>{t.name}</span>
-                      </div>
+                    <td style={{ padding:'8px', display:'flex', alignItems:'center', gap:8 }}>
+                    {t.logo && (
+                      <TeamLogo src={t.logo} alt={`${t.name} logo`} size={24} />
+                    )}
+                      <span>{t.name}</span>
                     </td>
-
                     <td style={{ padding:'8px' }}>
                       <span
                         className="badge"

@@ -3,6 +3,7 @@ import Tabs from './components/Tabs.jsx'
 import DataDownload from './pages/DataDownload.jsx'
 import TeamCompare from './pages/TeamCompare.jsx'
 import Rankings from './pages/Rankings.jsx'
+import SOSRankings from './pages/SOSRankings.jsx'
 import ConferenceRankings from './pages/ConferenceRankings.jsx'
 import ThemeToggle from './components/ThemeToggle.jsx'
 import { getManifest } from './store/dataState';
@@ -12,6 +13,7 @@ export default function App() {
   const tabs = [
     { key: 'download', title: 'Data Download' },
     { key: 'rankings', title: 'Rankings' },
+    { key: 'sosrankings', title: 'SOS Rankings' },
     { key: 'conf', title: 'Conference Rankings' },
     { key: 'compare', title: 'Compare Teams' },
   ]
@@ -45,6 +47,7 @@ export default function App() {
 
       {tab === 'download' && <DataDownload />}
       {tab === 'rankings' && <Rankings />}
+      {tab === 'sosrankings' && <SOSRankings />}
       {tab === 'conf' && <ConferenceRankings />}
       {tab === 'compare' && <TeamCompare />}
     </div>
