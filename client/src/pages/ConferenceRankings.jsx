@@ -3,13 +3,7 @@ import { rankTeams } from '../lib/rankAlgo'
 import { confColor } from '../lib/confColors'
 import { getManifest, getCachedManifest } from '../store/dataState';
 
-async function fetchJSON(path){
-  const res = await fetch(path)
-  if (!res.ok) throw new Error(`Failed ${path} (${res.status})`)
-  return res.json()
-}
-
-/* ---------- number helpers ---------- */
+// ---------- number + format helpers ----------
 const toNum = (v) => {
   const n = Number(v)
   return Number.isFinite(n) ? n : 0
@@ -23,7 +17,24 @@ const fmtOrDash = (v, d=2) => {
   const n = Number(v)
   return Number.isFinite(n) ? n.toFixed(d) : '—'
 }
+const pct = (num, den) => (den > 0 ? (num / den) : NaN)
 
+function median(arr) {
+  const xs = arr.filter(Number.isFinite).slice().sort((a,b)=>a-b)
+  if (!xs.length) return NaN
+  const mid = Math.floor(xs.length/2)
+  return xs.length % 2 ? xs[mid] : (xs[mid-1] + xs[mid]) / 2
+}
+function stdev(arr) {
+  const xs = arr.filter(Number.isFinite)
+  const n = xs.length; if (!n) return NaN
+  const mean = xs.reduce((s,x)=>s+x,0)/n
+  const v = xs.reduce((s,x)=> s + Math.pow(x-mean,2), 0) / n
+  return Math.sqrt(v)
+}
+const countIf = (list, fn) => { let c=0; for (const x of list) if (fn(x)) c++; return c }
+
+// ---------- model/data extractors ----------
 /* Prefer model-provided Results; otherwise compute from win%. */
 function getTeamResults(t){
   const r = [t?.results, t?.result, t?.baseline].find(isFiniteNum)
@@ -50,6 +61,10 @@ function buildTeamIndex(teamsRaw){
     if (t?.id != null) byId.set(Number(t.id), t)
     if (t?.school) byName.set(String(t.school).toLowerCase(), t)
     if (t?.name) byName.set(String(t.name).toLowerCase(), t)
+    if (Array.isArray(t?.alternateNames)) {
+      for (const alt of t.alternateNames) byName.set(String(alt).toLowerCase(), t)
+    }
+    if (t?.abbreviation) byName.set(String(t.abbreviation).toLowerCase(), t)
   }
   return { byId, byName }
 }
@@ -65,7 +80,41 @@ function attachLogos(rankedTeams, teamsRaw){
   })
 }
 
-/** Aggregate teams -> conference metrics (rank by avg Score) */
+/** --------- Enrich teams exactly like Rankings.jsx (PF/PA per game -> Off/Def ranks) ---------- */
+function enrichTeamsWithOffDef(ranked){
+  // Build quick rank map for opponent rank-based tallies if needed later
+  const rMap = new Map(ranked.map(t => [t.name, t.rank]))
+
+  // Tally PF/PA totals and some extras; derive per-game offense/defense
+  for (const t of ranked) {
+    let pf = 0, pa = 0
+    const games = t.games || []
+    for (const g of games) {
+      pf += (g.for || 0)
+      pa += (g.against || 0)
+    }
+    const gp = games.length || 1
+    t.pf = pf
+    t.pa = pa
+    t.off = pf / gp       // higher is better
+    t.def = pa / gp       // lower is better
+  }
+
+  // Create offense rank (descending off), defense rank (ascending def)
+  const withUsage = ranked.filter(t => Number.isFinite(t.off) && Number.isFinite(t.def))
+  const offOrder = [...withUsage].sort((a,b)=> b.off - a.off)
+  const offPos = new Map(offOrder.map((t,i)=>[t.name, i+1]))
+  const defOrder = [...withUsage].sort((a,b)=> a.def - b.def)
+  const defPos = new Map(defOrder.map((t,i)=>[t.name, i+1]))
+
+  for (const t of ranked) {
+    t.offRank = offPos.get(t.name) || null
+    t.defRank = defPos.get(t.name) || null
+  }
+  return ranked
+}
+
+/** --------- Aggregate teams -> conference metrics (rank by avg Score) ---------- */
 function aggregateConferences(teams) {
   const byConf = new Map()
   for (const t of teams) {
@@ -81,18 +130,28 @@ function aggregateConferences(teams) {
     const count = list.length
     const sumW = list.reduce((s,t)=> s + toNum(t?.w), 0)
     const sumL = list.reduce((s,t)=> s + toNum(t?.l), 0)
+    const gamesTotal = sumW + sumL
 
-    const avgScore   = avgOf(list, t => toNum(t?.score))
-    const avgResult  = avgOf(list, t => getTeamResults(t))
-    const avgSOS     = avgOf(list, t => toNum(t?.sos))
-    const avgQuality = avgOf(list, t => toNum(t?.quality))
-    const avgRank    = avgOf(list, t => isFiniteNum(t?.rank) ? Number(t.rank) : NaN)
+    const avgScore    = avgOf(list, t => toNum(t?.score))
+    const medianScore = median(list.map(t => toNum(t?.score)))
+    const avgResult   = avgOf(list, t => getTeamResults(t))
+    const avgSOS      = avgOf(list, t => toNum(t?.sos))
+    const avgQuality  = avgOf(list, t => toNum(t?.quality))
+    const avgRank     = avgOf(list, t => isFiniteNum(t?.rank) ? Number(t.rank) : NaN)
 
-    // Hi/Low overall team rank in conference (best is smallest number)
+    // Off/Def average ranks (now populated by enrichTeamsWithOffDef)
+    const avgOffRank  = avgOf(list, t => isFiniteNum(t?.offRank) ? Number(t.offRank) : NaN)
+    const avgDefRank  = avgOf(list, t => isFiniteNum(t?.defRank) ? Number(t.defRank) : NaN)
+
+    const winPct = pct(sumW, gamesTotal)
+    const top25Teams = countIf(list, t => isFiniteNum(t?.rank) && Number(t.rank) <= 25)
+    const scoreStdev = stdev(list.map(t => toNum(t?.score)))
+
+    // Hi/Low rank within conference
     let hiRank = NaN, lowRank = NaN
     for (const t of list){
       if (isFiniteNum(t?.rank)){
-        const rk = Number(t.rank)
+        const rk = Number(t?.rank)
         if (!Number.isFinite(hiRank) || rk < hiRank) hiRank = rk
         if (!Number.isFinite(lowRank) || rk > lowRank) lowRank = rk
       }
@@ -102,11 +161,13 @@ function aggregateConferences(teams) {
       conference,
       teams: list,
       count,
-      sumW, sumL,
+      sumW, sumL, gamesTotal, winPct,
       avgRank,
       hiRank: Number.isFinite(hiRank) ? hiRank : null,
       lowRank: Number.isFinite(lowRank) ? lowRank : null,
-      avgScore, avgResult, avgSOS, avgQuality,
+      avgScore, medianScore, avgResult, avgSOS, avgQuality,
+      avgOffRank, avgDefRank,
+      top25Teams, scoreStdev,
       confScore: avgScore,
     })
   }
@@ -116,7 +177,7 @@ function aggregateConferences(teams) {
   return rows
 }
 
-/** Small inline bar visualization */
+/** --------- Small inline bar visualization ---------- */
 function Bars({ items }) {
   const vals = items.map(i => Number(i?.value ?? 0)).filter(Number.isFinite)
   const maxAbs = Math.max(1, ...vals.map(Math.abs))
@@ -141,7 +202,7 @@ function Bars({ items }) {
   )
 }
 
-/* Copy button that won't bubble row click */
+/* --------- Copy button that won't bubble row click ---------- */
 function CopyButton({ payload, onCopied }) {
   const [ok, setOk] = useState(false);
 
@@ -157,7 +218,7 @@ function CopyButton({ payload, onCopied }) {
       }}
       title="Copy summary"
       style={{
-        width: "4.5em",          // matches "Copy"
+        width: "4.5em",
         display: "inline-flex",
         justifyContent: "center",
         alignItems: "center",
@@ -168,7 +229,7 @@ function CopyButton({ payload, onCopied }) {
   );
 }
 
-
+/** --------- Drawer with details ---------- */
 function Drawer({ open, row, onClose, onPrev, onNext }) {
   useEffect(() => {
     if (!open) return
@@ -185,16 +246,21 @@ function Drawer({ open, row, onClose, onPrev, onNext }) {
 
   const {
     conference, rank, teams, count,
-    sumW, sumL,
-    avgScore, avgResult, avgSOS, avgQuality,
-    avgRank
+    sumW, sumL, winPct,
+    avgScore, medianScore, avgResult, avgSOS, avgQuality,
+    avgRank, avgOffRank, avgDefRank,
+    top25Teams, scoreStdev
   } = row
 
   const bars = [
     { label: 'Avg Score', value: avgScore },
+    { label: 'Median Score', value: medianScore },
     { label: 'Avg SOS', value: avgSOS },
     { label: 'Avg Quality', value: avgQuality },
     { label: 'Avg Results', value: avgResult },
+    // invert Off/Def rank so "longer bar = better" (lower rank is better)
+    { label: 'Avg Off Rk (lower=better)', value: -avgOffRank, hint: 'Inverted for visualization' },
+    { label: 'Avg Def Rk (lower=better)', value: -avgDefRank, hint: 'Inverted for visualization' },
   ]
 
   return (
@@ -221,11 +287,17 @@ function Drawer({ open, row, onClose, onPrev, onNext }) {
           <div className="drawer-kpis">
             <div className="kpi"><div className="kpi-label">Teams</div><div className="kpi-val">{count}</div></div>
             <div className="kpi"><div className="kpi-label">W-L</div><div className="kpi-val">{sumW}-{sumL}</div></div>
+            <div className="kpi"><div className="kpi-label">Win %</div><div className="kpi-val">{Number.isFinite(winPct) ? (winPct*100).toFixed(1)+'%' : '—'}</div></div>
             <div className="kpi"><div className="kpi-label">Avg Rank</div><div className="kpi-val">{fmtOrDash(avgRank,2)}</div></div>
             <div className="kpi"><div className="kpi-label">Avg Score</div><div className="kpi-val">{fmt(avgScore,3)}</div></div>
+            <div className="kpi"><div className="kpi-label">Median Score</div><div className="kpi-val">{fmtOrDash(medianScore,3)}</div></div>
             <div className="kpi"><div className="kpi-label">Avg SOS</div><div className="kpi-val">{fmt(avgSOS,3)}</div></div>
             <div className="kpi"><div className="kpi-label">Avg Quality</div><div className="kpi-val">{fmt(avgQuality,3)}</div></div>
             <div className="kpi"><div className="kpi-label">Avg Results</div><div className="kpi-val">{fmt(avgResult,3)}</div></div>
+            <div className="kpi"><div className="kpi-label">Avg Off Rk</div><div className="kpi-val">{fmtOrDash(avgOffRank,1)}</div></div>
+            <div className="kpi"><div className="kpi-label">Avg Def Rk</div><div className="kpi-val">{fmtOrDash(avgDefRank,1)}</div></div>
+            <div className="kpi"><div className="kpi-label">Top-25</div><div className="kpi-val">{top25Teams ?? 0}</div></div>
+            <div className="kpi"><div className="kpi-label">Score σ</div><div className="kpi-val">{fmtOrDash(scoreStdev,3)}</div></div>
           </div>
 
           <div className="drawer-section">
@@ -282,7 +354,11 @@ function Drawer({ open, row, onClose, onPrev, onNext }) {
           <div className="drawer-section">
             <div className="row" style={{ gap: 6 }}>
               <CopyButton payload={
-                `#${rank} ${conference} — W-L ${sumW}-${sumL} | Avg Rank ${fmtOrDash(avgRank,2)} | Conf Avg ${fmt(avgScore,3)} | Avg SOS ${fmt(avgSOS,3)} | Avg Quality ${fmt(avgQuality,3)} | Avg Results ${fmt(avgResult,3)}`
+                `#${rank} ${conference} — W-L ${sumW}-${sumL} (Win ${(Number.isFinite(winPct)?(winPct*100).toFixed(1)+'%':'—')}) | `+
+                `Avg Rank ${fmtOrDash(avgRank,2)} | Avg ${fmt(avgScore,3)} / Med ${fmtOrDash(medianScore,3)} | ` +
+                `SOS ${fmt(avgSOS,3)} | Qual ${fmt(avgQuality,3)} | Res ${fmt(avgResult,3)} | ` +
+                `OffRk ${fmtOrDash(avgOffRank,1)} | DefRk ${fmtOrDash(avgDefRank,1)} | ` +
+                `Top-25 ${top25Teams ?? 0} | σ ${fmtOrDash(scoreStdev,3)}`
               }/>
               <button className="btn" onClick={onClose}>Close</button>
             </div>
@@ -293,6 +369,7 @@ function Drawer({ open, row, onClose, onPrev, onNext }) {
   )
 }
 
+/** --------- Main component ---------- */
 export default function ConferenceRankings(){
   const [year, setYear] = useState(2025)
   const [loading, setLoading] = useState(true)
@@ -316,18 +393,44 @@ export default function ConferenceRankings(){
       try {
         const m = await getManifest(Number(year)); if (cancelled) return; setManifest(m)
 
-        // Load raw teams for logos + fallback and games
-        const teamsRaw = await fetch(`/data/${year}/teams-fbs.json`)
-          .then(r => r.ok ? r.json() : fetch(`/data/${year}/teams.json`).then(r2 => {
-            if (!r2.ok) throw new Error(`Failed /data/${year}/teams.json (${r2.status})`)
-            return r2.json()
-          }))
+        // Use the SAME inputs as Rankings:
+        // 1) prefer ALL teams (FBS+FCS) so FCS games count, fallback to FBS
+        const teamsPromise = fetch(`/data/${year}/teams.json`)
+          .then(async r => {
+            if (r.ok) return r.json();
+            const r2 = await fetch(`/data/${year}/teams-fbs.json`);
+            if (!r2.ok) throw new Error(`Failed /data/${year}/teams.json (${r.status}) and /teams-fbs.json (${r2.status})`);
+            return r2.json();
+          });
 
-        const games = await fetch(`/data/${year}/games-regular.json`)
-          .then(r => { if (!r.ok) throw new Error(`Failed /data/${year}/games-regular.json (${r.status})`); return r.json() })
+        // 2) regular-season games
+        const gamesPromise = fetch(`/data/${year}/games-regular.json`)
+          .then(r => { if (!r.ok) throw new Error(`Failed /data/${year}/games-regular.json (${r.status})`); return r.json() });
 
-        // Rank, then attach logos from teamsRaw
-        const rankedTeams = rankTeams({ teamsRaw, gamesRaw: games })
+        // 3) optional preseason prior (OK if missing)
+        const spPromise = fetch(`/data/${year}/sp-ratings.json`)
+          .then(r => r.ok ? r.json() : []);
+
+        const [teamsRaw, games, sp] = await Promise.all([teamsPromise, gamesPromise, spPromise])
+
+        if (cancelled) return;
+
+        // Compute the SAME rankings as the Rankings tab
+        let rankedTeams = rankTeams({ teamsRaw, gamesRaw: games, spRaw: sp })
+
+        // UI-side tiny nudge to mirror Rankings
+        for (const t of rankedTeams) {
+          const gp = (t.games || []).length
+          if (gp >= 3 && t.l === 0) t.score += 0.01
+          if (t.l >= 2 && gp <= 5) t.score -= 0.01
+        }
+        rankedTeams.sort((a,b)=> b.score - a.score)
+        rankedTeams.forEach((t,i)=> t.rank = i+1)
+
+        // >>> NEW: compute Off/Def ranks exactly like Rankings.jsx
+        rankedTeams = enrichTeamsWithOffDef(rankedTeams)
+
+        // attach logos from teams data
         const withLogos = attachLogos(Array.isArray(rankedTeams) ? rankedTeams : [], teamsRaw)
 
         setTeams(withLogos)
@@ -378,12 +481,18 @@ export default function ConferenceRankings(){
                 <th style={{ padding:'8px' }}>Conference</th>
                 <th style={{ padding:'8px' }}>Teams</th>
                 <th style={{ padding:'8px' }}>W-L</th>
+                <th style={{ padding:'8px' }}>Win %</th>
                 <th style={{ padding:'8px' }}>Hi / Low</th>
                 <th style={{ padding:'8px' }}>Avg Rank</th>
                 <th style={{ padding:'8px' }}>Avg Score</th>
+                <th style={{ padding:'8px' }}>Median Score</th>
                 <th style={{ padding:'8px' }}>Avg SOS</th>
                 <th style={{ padding:'8px' }}>Avg Quality</th>
                 <th style={{ padding:'8px' }}>Avg Results</th>
+                <th style={{ padding:'8px' }}>Avg Off Rk</th>
+                <th style={{ padding:'8px' }}>Avg Def Rk</th>
+                <th style={{ padding:'8px' }}>Top-25</th>
+                <th style={{ padding:'8px' }}>Score σ</th>
                 <th style={{ padding:'8px' }}></th>
               </tr>
             </thead>
@@ -391,9 +500,12 @@ export default function ConferenceRankings(){
               {confRows.map((r, i) => {
                 const hiLow = (r.hiRank && r.lowRank) ? `${r.hiRank} / ${r.lowRank}` : '—'
                 const payload =
-                  `#${r.rank} ${r.conference} — W-L ${r.sumW}-${r.sumL} | Hi/Low ${hiLow} | ` +
-                  `Avg Rank ${fmtOrDash(r.avgRank,2)} | Conf Avg ${fmt(r.avgScore)} | ` +
-                  `SOS ${fmt(r.avgSOS)} | Quality ${fmt(r.avgQuality)} | Results ${fmt(r.avgResult)}`
+                  `#${r.rank} ${r.conference} — W-L ${r.sumW}-${r.sumL} (Win ${Number.isFinite(r.winPct)?(r.winPct*100).toFixed(1)+'%':'—'}) | ` +
+                  `Hi/Low ${hiLow} | Avg Rank ${fmtOrDash(r.avgRank,2)} | ` +
+                  `Avg ${fmt(r.avgScore)} / Med ${fmtOrDash(r.medianScore,3)} | ` +
+                  `SOS ${fmt(r.avgSOS)} | Quality ${fmt(r.avgQuality)} | Results ${fmt(r.avgResult)} | ` +
+                  `OffRk ${fmtOrDash(r.avgOffRank,1)} | DefRk ${fmtOrDash(r.avgDefRank,1)} | ` +
+                  `Top-25 ${r.top25Teams ?? 0} | σ ${fmtOrDash(r.scoreStdev,3)}`
                 return (
                   <tr
                     key={r.conference}
@@ -412,12 +524,20 @@ export default function ConferenceRankings(){
                     </td>
                     <td style={{ padding:'8px' }}>{r.count}</td>
                     <td style={{ padding:'8px' }}>{r.sumW}-{r.sumL}</td>
+                    <td style={{ padding:'8px' }}>
+                      {Number.isFinite(r.winPct) ? (r.winPct*100).toFixed(1) + '%' : '—'}
+                    </td>
                     <td style={{ padding:'8px' }}>{hiLow}</td>
                     <td style={{ padding:'8px' }}>{fmtOrDash(r.avgRank,2)}</td>
                     <td style={{ padding:'8px' }}>{fmt(r.avgScore)}</td>
+                    <td style={{ padding:'8px' }}>{fmtOrDash(r.medianScore,3)}</td>
                     <td style={{ padding:'8px' }}>{fmt(r.avgSOS)}</td>
                     <td style={{ padding:'8px' }}>{fmt(r.avgQuality)}</td>
                     <td style={{ padding:'8px' }}>{fmt(r.avgResult)}</td>
+                    <td style={{ padding:'8px' }}>{fmtOrDash(r.avgOffRank,1)}</td>
+                    <td style={{ padding:'8px' }}>{fmtOrDash(r.avgDefRank,1)}</td>
+                    <td style={{ padding:'8px' }}>{r.top25Teams ?? 0}</td>
+                    <td style={{ padding:'8px' }}>{fmtOrDash(r.scoreStdev,3)}</td>
                     <td style={{ padding:'8px' }}>
                       <CopyButton payload={payload} />
                     </td>
