@@ -5,6 +5,8 @@ import TeamCompare from './pages/TeamCompare.jsx'
 import Rankings from './pages/Rankings.jsx'
 import SOSRankings from './pages/SOSRankings.jsx'
 import ConferenceRankings from './pages/ConferenceRankings.jsx'
+import Head2Headv2 from './pages/Head2Headv2.jsx'
+import NarrativeTop25 from './pages/NarrativeTop25.jsx'
 import ThemeToggle from './components/ThemeToggle.jsx'
 import { getManifest } from './store/dataState';
 
@@ -16,6 +18,8 @@ export default function App() {
     { key: 'sosrankings', title: 'SOS Rankings' },
     { key: 'conf', title: 'Conference Rankings' },
     { key: 'compare', title: 'Compare Teams' },
+    { key: 'h2hv2', title: 'Head-to-Head V2' },
+    { key: 'narrative', title: 'Narrative Top 25' },
   ]
 
   useEffect(() => { getManifest(2025).catch(() => {}) }, [])
@@ -50,6 +54,8 @@ export default function App() {
       {tab === 'sosrankings' && <SOSRankings />}
       {tab === 'conf' && <ConferenceRankings />}
       {tab === 'compare' && <TeamCompare />}
+      {tab === 'h2hv2' && <Head2Headv2 />}
+      {tab === 'narrative' && <NarrativeTop25 />}
     </div>
   )
 }
